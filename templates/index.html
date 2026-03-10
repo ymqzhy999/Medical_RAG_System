@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - 智能医疗问答系统</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; height: 100vh; display: flex; }
+
+        /* 左侧品牌区 */
+        .brand-section {
+            flex: 1;
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 60px;
+            position: relative;
+            overflow: hidden;
+        }
+        .brand-section::after {
+            content: '';
+            position: absolute;
+            width: 300px; height: 300px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            bottom: -50px; left: -50px;
+        }
+        .brand-title { font-size: 3em; font-weight: bold; margin-bottom: 20px; }
+        .brand-desc { font-size: 1.2em; opacity: 0.9; line-height: 1.6; }
+
+        /* 右侧表单区 */
+        .form-section {
+            width: 450px;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+        .form-card { width: 100%; max-width: 320px; }
+        .form-header { font-size: 24px; color: #333; margin-bottom: 30px; font-weight: 600; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: #666; font-size: 14px; }
+        .form-input {
+            width: 100%; padding: 12px;
+            border: 1px solid #ddd; border-radius: 6px;
+            transition: border-color 0.3s;
+        }
+        .form-input:focus { border-color: #3b82f6; outline: none; }
+
+        .btn-primary {
+            width: 100%; padding: 12px;
+            background-color: #3b82f6; color: white;
+            border: none; border-radius: 6px;
+            font-size: 16px; cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-primary:hover { background-color: #2563eb; }
+
+        .toggle-text { margin-top: 20px; text-align: center; font-size: 14px; color: #666; }
+        .toggle-text a { color: #3b82f6; text-decoration: none; cursor: pointer; }
+
+        /* Toast 消息提示框样式 */
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            min-width: 300px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.3s ease;
+            pointer-events: auto;
+            border-left: 4px solid #ddd;
+        }
+
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.success { border-left-color: #22c55e; color: #15803d; }
+        .toast.success i { color: #22c55e; }
+        .toast.error { border-left-color: #ef4444; color: #b91c1c; }
+        .toast.error i { color: #ef4444; }
+        .toast.info { border-left-color: #3b82f6; color: #1d4ed8; }
+        .toast.info i { color: #3b82f6; }
+    </style>
+</head>
+<body style="visibility: hidden;"> <div id="toast-container"></div>
+
+    <div class="brand-section">
+        <h1 class="brand-title"><i class="fa-solid fa-heart-pulse"></i> 智医 RAG</h1>
+        <p class="brand-desc">
+            基于大语言模型与混合检索技术的<br>
+            智能医疗辅助问答系统<br><br>
+            <small>✅ 循证医学支持 &nbsp;&nbsp; ✅ 隐私数据保护</small>
+        </p>
+    </div>
+
+    <div class="form-section">
+        <div class="form-card">
+            <h2 class="form-header" id="form-title">用户登录</h2>
+            <form id="auth-form" onsubmit="handleAuth(event)">
+                <div class="form-group">
+                    <label>账号 / 学号</label>
+                    <input type="text" class="form-input" id="username" required placeholder="请输入账号 / 学号">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" class="form-input" id="password" required placeholder="请输入密码">
+                </div>
+
+                <div class="form-group" id="captcha-group" style="display: none;">
+                    <label>验证码</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" class="form-input" id="captcha-input" placeholder="输入右侧字符" style="flex: 1;">
+                        <img id="captcha-img" src="" onclick="refreshCaptcha()" style="height: 44px; cursor: pointer; border-radius: 4px; border: 1px solid #ddd;" title="点击刷新">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-primary" id="submit-btn">立即登录</button>
+            </form>
+            <div class="toggle-text">
+                <span id="toggle-msg">还没有账号？</span>
+                <a onclick="toggleMode()" id="toggle-link">去注册</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 核心逻辑 1: 页面一加载就检查登录状态 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const userId = localStorage.getItem('user_id');
+            const role = localStorage.getItem('role');
+
+            if (userId && role !== null) {
+                // 如果有缓存，直接跳转
+                // 可以加个简单的 Toast 提示体验更好
+                showToast('检测到登录状态，正在跳转...', 'info');
+
+                setTimeout(() => {
+                    if (parseInt(role) === 1) {
+                        window.location.href = '/admin';
+                    } else {
+                        window.location.href = '/chat';
+                    }
+                }, 800); // 稍微留一点时间展示提示
+            } else {
+                // 如果没登录，把页面显示出来
+                document.body.style.visibility = 'visible';
+            }
+        });
+
+        let isLogin = true;
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            const iconClass = type === 'success' ? 'fa-circle-check' : (type === 'error' ? 'fa-circle-xmark' : 'fa-circle-info');
+
+            toast.innerHTML = `<i class="fa-solid ${iconClass}"></i><span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.add('show'), 10);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
+        }
+
+        function toggleMode() {
+            isLogin = !isLogin;
+            document.getElementById('form-title').innerText = isLogin ? '用户登录' : '新用户注册';
+            document.getElementById('submit-btn').innerText = isLogin ? '立即登录' : '注册账号';
+            document.getElementById('toggle-msg').innerText = isLogin ? '还没有账号？' : '已有账号？';
+            document.getElementById('toggle-link').innerText = isLogin ? '去注册' : '去登录';
+
+            const captchaGroup = document.getElementById('captcha-group');
+            if (!isLogin) {
+                captchaGroup.style.display = 'block';
+                refreshCaptcha();
+                document.getElementById('captcha-input').required = true;
+            } else {
+                captchaGroup.style.display = 'none';
+                document.getElementById('captcha-input').required = false;
+            }
+        }
+
+        function refreshCaptcha() {
+            document.getElementById('captcha-img').src = "/api/auth/captcha?t=" + new Date().getTime();
+        }
+
+
+        async function handleAuth(e) {
+            e.preventDefault();
+
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+            const username = usernameInput.value;
+            const password = passwordInput.value;
+            const captcha = document.getElementById('captcha-input').value;
+
+            const submitBtn = document.getElementById('submit-btn');
+            submitBtn.disabled = true;
+            submitBtn.innerText = "处理中...";
+
+            let endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+            if (!isLogin) endpoint += `?captcha=${captcha}`;
+
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+
+                    // ⚠️⚠️⚠️ 关键修改：加上这一行，允许携带 Cookie ⚠️⚠️⚠️
+                    credentials: 'include',
+
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (isLogin) {
+                        // 处理新的登录响应格式（包含 user 对象）
+                        const userData = data.user || data;
+                        const username = userData.username || data.username;
+                        const userId = userData.id || data.user_id;
+                        const role = userData.role || data.role;
+                        const avatarUrl = userData.avatar_url || userData.avatarUrl || data.avatar_url || data.avatarUrl || '';
+                        
+                        showToast(`登录成功！欢迎回来，${username}`, 'success');
+                        localStorage.setItem('user_id', userId);
+                        localStorage.setItem('username', username);
+                        localStorage.setItem('role', role);
+                        if (avatarUrl) {
+                            localStorage.setItem('avatar_url', avatarUrl);
+                        }
+
+                        setTimeout(() => {
+                            if (role === 1) {
+                                window.location.href = '/admin';
+                            } else {
+                                window.location.href = '/chat';
+                            }
+                        }, 1500);
+                    } else {
+                        showToast("注册成功！请直接登录。", 'success');
+                        toggleMode();
+                        usernameInput.value = username;
+                        passwordInput.value = "";
+                    }
+                } else {
+                    // 处理 403 错误（账号被封禁）
+                    if (response.status === 403) {
+                        showToast(data.detail || "账号已被封禁，请联系管理员", 'error');
+                } else {
+                    showToast(data.detail || "操作失败", 'error');
+                    }
+                    // 失败后自动刷新一下验证码，防止用户重复提交旧的
+                    if (!isLogin) refreshCaptcha();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast("系统连接失败，请检查后端", 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerText = isLogin ? '立即登录' : '注册账号';
+            }
+        }
+    </script>
+</body>
+</html>

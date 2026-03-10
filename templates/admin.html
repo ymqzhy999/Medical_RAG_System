@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>医疗系统 - 管理后台</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="../static/css/admin.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script>
+        (function() {
+            const userId = localStorage.getItem('user_id');
+
+            if (!userId) {
+                window.location.replace("/");
+                return;
+            }
+
+        })();
+    </script>
+
+</head>
+<body>
+
+<div class="sidebar">
+    <h2 style="color:#fff; margin-bottom: 30px; font-size: 18px;"><i class="fa-solid fa-user-doctor"></i> 管理后台</h2>
+
+    <div class="menu-item active" onclick="switchView('chart-dashboard', this)">
+        <i class="fa-solid fa-chart-line"></i> 数据看板
+    </div>
+
+    <div class="menu-item" onclick="switchView('dashboard', this)">
+        <i class="fa-solid fa-comments"></i> 用户反馈
+    </div>
+
+    <div class="menu-item" onclick="switchView('users', this)">
+        <i class="fa-solid fa-users-gear"></i> 用户管理
+    </div>
+
+    <div class="menu-item" onclick="switchView('prompts', this)">
+        <i class="fa-solid fa-wand-magic-sparkles"></i> 提示词工程
+    </div>
+
+    <div class="menu-item" onclick="switchView('knowledge', this)">
+        <i class="fa-solid fa-database"></i> 知识库管理
+    </div>
+
+    <div class="menu-item logout-btn" onclick="handleAdminLogout()">
+        <i class="fa-solid fa-right-from-bracket"></i> 退出登录
+    </div>
+</div>
+
+<div class="main">
+
+    <!-- 数据看板视图 -->
+    <div id="view-chart-dashboard" style="display: none; padding: 30px 40px;">
+        <h2 style="margin-bottom: 20px; font-size: 20px;"><i class="fa-solid fa-chart-line"></i> 数据看板</h2>
+        
+        <div class="stats-grid" id="stats-box-new" style="margin-bottom: 30px;">
+            <div class="card"><h3>加载中...</h3></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div class="card" style="padding: 20px;">
+                <h3 style="margin-bottom: 15px;">用户反馈分布</h3>
+                <div id="chart-feedback" style="width: 100%; height: 250px;"></div>
+            </div>
+            <div class="card" style="padding: 20px;">
+                <h3 style="margin-bottom: 15px;">平均响应时间</h3>
+                <div id="chart-speed" style="width: 100%; height: 250px;"></div>
+            </div>
+        </div>
+
+        <div class="card" style="padding: 20px;">
+            <h3 style="margin-bottom: 15px;">消极敏感提问用户排行</h3>
+            <div id="chart-risk" style="width: 100%; height: 250px;"></div>
+        </div>
+    </div>
+
+    <!-- 用户反馈视图 -->
+    <div id="view-dashboard" style="display: none;">
+        <div class="stats-grid" id="stats-box">
+            <div class="card"><h3>加载中...</h3></div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2 style="margin: 0; font-size: 18px;">用户反馈记录</h2>
+            <div style="display: flex; gap: 10px; align-items: center;">
+
+                <button class="btn-primary" onclick="deleteSelectedFeedbacks()" id="delete-feedback-btn" 
+                        style="padding: 8px 16px; display: none;">
+                    <i class="fa-solid fa-trash"></i> 删除选中
+                </button>
+            </div>
+        </div>
+        <div class="filter-tabs">
+            <div class="tabs-left">
+                <button class="tab-btn active" onclick="loadFeedbacks('all', this)">全部反馈</button>
+                <button class="tab-btn" onclick="loadFeedbacks('like', this)">只看好评</button>
+                <button class="tab-btn" onclick="loadFeedbacks('dislike', this)">只看差评</button>
+            </div>
+            <div class="search-container">
+                <input type="text" id="feedback-search" placeholder="搜索用户名或内容..." 
+                       onkeyup="if(event.key === 'Enter') handleFeedbackSearch(event)">
+                <button class="search-btn" onclick="handleFeedbackSearch(event)" title="搜索"><i class="fa-solid fa-search"></i></button>
+                <button class="reset-btn" onclick="resetFeedbackSearch()" title="重置"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                <tr>
+                    <th class="checkbox-col">
+                        <input type="checkbox" id="select-all-feedback" onclick="toggleSelectAllFeedback(this)">
+                    </th>
+                    <th class="col-user">用户</th>
+                    <th class="col-query">用户提问</th>
+                    <th class="col-reply">AI 回复</th>
+                    <th class="col-time">时间</th>
+                    <th class="col-status">状态</th>
+                </tr>
+                </thead>
+                <tbody id="feedback-table"></tbody>
+            </table>
+        </div>
+
+        <div class="pagination-container">
+            <div id="page-stats">共 0 条数据</div>
+            <div class="pagination-controls">
+                <button class="page-btn" disabled id="prev-btn" onclick="changePage(-1)"><i
+                        class="fa-solid fa-chevron-left"></i> 上一页
+                </button>
+                <span class="page-info">第 <span id="curr-page-num">1</span> / <span
+                        id="total-page-num">1</span> 页</span>
+                <button class="page-btn" disabled id="next-btn" onclick="changePage(1)">下一页 <i
+                        class="fa-solid fa-chevron-right"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-prompts" style="display: none;">
+        <div class="prompt-list-panel">
+            <div class="panel-header">
+                <span>Prompts 列表</span>
+                <i class="fa-solid fa-rotate" onclick="loadPrompts()"
+                   style="cursor:pointer; font-size:14px; color:#666;" title="刷新"></i>
+            </div>
+            <div class="list-container" id="prompt-list"></div>
+        </div>
+
+        <div class="editor-panel">
+            <div class="editor-header">
+                <div id="current-key" style="font-size: 15px; font-weight: bold; color: #fff;">请选择左侧提示词</div>
+                <div style="display:flex; align-items:center;">
+                    <span id="save-status"
+                          style="margin-right: 15px; font-size: 13px; color: #4caf50; display: none;"><i
+                            class="fa-solid fa-check"></i> 已保存</span>
+                    <button class="btn-primary" disabled id="save-btn" onclick="savePrompt()">
+                        <i class="fa-solid fa-floppy-disk"></i> 保存修改
+                    </button>
+                </div>
+            </div>
+
+            <div class="editor-layout">
+                <div class="editor-section">
+                    <div class="editor-container">
+                        <textarea class="prompt-textarea" disabled id="prompt-editor"
+                                  placeholder="选择左侧提示词以开始编辑..."></textarea>
+                    </div>
+                </div>
+
+                <div class="playground-section">
+                    <div class="playground-header">
+                        <span>🧪 RAG 全链路仿真 (End-to-End Simulator)</span>
+                        <button class="btn-primary" id="run-chain-btn" onclick="runChainTest()"
+                                style="padding: 4px 12px; font-size: 12px;">
+                            <i class="fa-solid fa-play"></i> 运行仿真
+                        </button>
+                    </div>
+
+                    <div class="playground-body" style="flex-direction: column; gap: 0; padding:0; overflow:hidden;">
+                        <div style="padding: 15px; border-bottom: 1px solid #333; background:#1e1e1e;">
+                            <input class="input-box" id="chain-query" placeholder="在此输入测试问题，例如：头痛吃什么药？"
+                                   style="width:100%; box-sizing:border-box;"
+                                   type="text"/>
+                        </div>
+                        <div style="display:flex; flex:1; min-height:0;">
+                            <div class="chain-list-col" id="chain-list">
+                                <div style="text-align:center; color:#666; margin-top:30px; font-size:12px;">
+                                    <i class="fa-solid fa-arrow-up"></i><br>输入问题并运行
+                                </div>
+                            </div>
+                            <div class="chain-detail-col">
+                                <div class="detail-header">
+                                    <span id="detail-title">详细信息</span>
+                                    <span id="detail-time" style="color:#666; font-weight:normal;"></span>
+                                </div>
+                                <div class="detail-content" id="detail-content">
+                                    <div style="color:#666; margin-top:30px; text-align:center;">
+                                        <i class="fa-regular fa-hand-point-left"></i> 点击左侧步骤查看完整 Prompt 和结果
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-knowledge" style="display: none; padding: 30px 40px; overflow-y: auto;">
+
+        <div style="display: flex; gap: 20px; margin-bottom: 30px;">
+            <div class="card" style="flex: 1; display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                    <h3><i class="fa-solid fa-file-pdf"></i> 文档总数</h3>
+                    <div class="num" id="kb-doc-count">0</div>
+                </div>
+                <div style="font-size: 40px; opacity: 0.1;"><i class="fa-solid fa-folder-open"></i></div>
+            </div>
+
+            <div class="card" style="flex: 1; display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                    <h3><i class="fa-solid fa-layer-group"></i> 向量切片 (Chunks)</h3>
+                    <div class="num" id="kb-chunk-count">0</div>
+                </div>
+                <div style="font-size: 40px; opacity: 0.1;"><i class="fa-solid fa-database"></i></div>
+            </div>
+
+            <div class="upload-zone" id="upload-zone" style="flex: 2;">
+            <input type="file" id="file-input" multiple accept=".csv, application/vnd.ms-excel, text/csv, .md, text/markdown" style="display: none;" onchange="handleFileSelect(this)">                <div style="text-align: center;">
+                    <i class="fa-solid fa-cloud-arrow-up" style="font-size: 24px; color: #a8c7fa; margin-bottom: 8px;"></i>
+                    <div style="font-size: 14px; color: #ccc;">点击或拖拽上传 CSV,MD格式医学数据</div>
+                    <button class="btn-primary" onclick="document.getElementById('file-input').click()" style="margin: 10px auto 0; font-size: 12px;">选择文件</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel-header" style="background: #1e1e1e; border-radius: 12px 12px 0 0; border: 1px solid #2a2a2a;">
+            <span>📚 已索引文档列表</span>
+            <button class="btn-primary" onclick="loadKnowledgeBase()" style="padding: 4px 10px; font-size: 12px;">
+                <i class="fa-solid fa-rotate"></i> 刷新
+            </button>
+        </div>
+
+        <div class="table-container" style="border-radius: 0 0 12px 12px; border-top: none;">
+            <table>
+                <thead>
+                <tr>
+                    <th class="checkbox-col">
+                <input type="checkbox" id="select-all" onclick="toggleSelectAll(this)">
+            </th>
+                    <th style="width: 40%;">文件名</th>
+                    <th style="width: 15%;">大小</th>
+                    <th style="width: 15%;">切片数</th>
+                    <th style="width: 15%;">状态</th>
+                    <th style="width: 15%;">操作</th>
+                </tr>
+                </thead>
+                <tbody id="kb-table-body"></tbody>
+            </table>
+        </div>
+<div class="batch-toolbar" id="batch-toolbar">
+    <span class="batch-info">已选择 <span id="selected-count" style="color:#3b82f6">0</span> 项</span>
+    <div style="height: 20px; width: 1px; background: #555;"></div>
+
+    <button class="btn-round" onclick="batchAction('archive')" style="background:#6b7280;">
+        <i class="fa-solid fa-box-archive"></i> 批量归档
+    </button>
+
+    <button class="btn-round" onclick="batchAction('enable')" style="background:#3b82f6;">
+        <i class="fa-solid fa-box-open"></i> 批量启用
+    </button>
+
+    <button class="btn-round" onclick="batchAction('delete')" style="background:#ef4444;">
+        <i class="fa-solid fa-trash"></i> 批量删除
+    </button>
+</div>
+        <div class="pagination-container" style="margin-top: 10px; border-top: 1px solid #2a2a2a; padding-top: 15px;">
+            <div id="kb-page-stats" style="color: #888; font-size: 13px;">共 0 条数据</div>
+            <div class="pagination-controls">
+                <button class="page-btn" disabled id="kb-prev-btn" onclick="changeKbPage(-1)">
+                    <i class="fa-solid fa-chevron-left"></i> 上一页
+                </button>
+                <span class="page-info">第 <span id="kb-curr-page">1</span> / <span id="kb-total-page">1</span> 页</span>
+                <button class="page-btn" disabled id="kb-next-btn" onclick="changeKbPage(1)">
+                    下一页 <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 用户管理视图 -->
+    <div id="view-users" style="display: none; padding: 30px 40px;">
+        <h2 style="margin-bottom: 20px; font-size: 20px;"><i class="fa-solid fa-users-gear"></i> 用户管理</h2>
+        
+        <div class="table-container">
+            <table>
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>用户名</th>
+                    <th>角色</th>
+                    <th>注册时间</th>
+                    <th>最后登录</th>
+                    <th>状态</th>
+                </tr>
+                </thead>
+                <tbody id="users-table-body"></tbody>
+            </table>
+        </div>
+
+        <div class="pagination-container" style="margin-top: 15px;">
+            <div id="user-page-stats" style="color: #888; font-size: 13px;">共 0 人</div>
+            <div class="pagination-controls">
+                <button class="page-btn" disabled id="user-prev-btn" onclick="changeUserPage(-1)">
+                    <i class="fa-solid fa-chevron-left"></i> 上一页
+                </button>
+                <span class="page-info">第 <span id="user-curr-page">1</span> / <span id="user-total-page">1</span> 页</span>
+                <button class="page-btn" disabled id="user-next-btn" onclick="changeUserPage(1)">
+                    下一页 <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="detail-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span style="font-weight:bold;">📜 对话详情</span>
+            <button onclick="document.getElementById('detail-modal').style.display='none'"
+                    style="background:none; border:none; color:#fff; cursor:pointer; font-size:20px;">×
+            </button>
+        </div>
+        <div class="modal-body" id="modal-chat-container"></div>
+    </div>
+</div>
+
+<script src="../static/js/controllers/admin.js"></script>
+</body>
+</html>

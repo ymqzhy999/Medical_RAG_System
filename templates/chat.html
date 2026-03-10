@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>智能医疗问答系统</title>
+    <link href="/static/css/style.css" rel="stylesheet">
+<link href="/static/css/chat.css?v=888" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        /* 右侧参考资料侧边栏 */
+        .source-sidebar {
+            position: fixed;
+            top: 0;
+            right: -450px; /* 默认隐藏 */
+            width: 400px;
+            height: 100vh;
+            background-color: #1e1e1e;
+            border-left: 1px solid #333;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+            transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.3s;
+            z-index: 2000; /* 层级最高 */
+            display: flex;
+            flex-direction: column;
+            visibility: hidden; /* 默认不可见，防止误触 */
+        }
+        .source-sidebar.active {
+            right: 0;
+            visibility: visible;
+        }
+        .sidebar-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #252525;
+        }
+        .sidebar-title { color: #fff; font-size: 16px; font-weight: 600; margin: 0; }
+        .sidebar-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+            color: #ccc;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap; /* 保留换行符 */
+        }
+
+        /* 修复输入框样式：去掉滚动条 */
+        #user-input {
+            overflow-y: hidden !important;
+            resize: none !important;
+            min-height: 44px;
+            max-height: 150px;
+            line-height: 1.5;
+            padding: 12px 15px;
+            border-radius: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <aside class="sidebar-left" id="sidebar">
+        <div class="sidebar-header-area">
+            <button class="new-chat-btn"><i class="fa-solid fa-plus"></i> 新建对话</button>
+        </div>
+
+        <div class="history-list" id="history-list">
+            <div style="padding: 20px; text-align: center; color: #64748b; font-size: 13px;">
+                <i class="fa-solid fa-spinner fa-spin"></i> 加载中...
+            </div>
+        </div>
+
+        <div class="sidebar-footer">
+            <button class="icon-btn" id="theme-btn" title="切换主题">
+                <i class="fa-solid fa-moon"></i>
+            </button>
+
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="top-bar">
+            <div class="left-controls">
+                <button class="toggle-sidebar-btn" id="toggle-menu-btn">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <span class="current-topic">新问诊对话</span>
+            </div>
+
+            <div class="user-area" onclick="openProfileModal()" title="个人中心">
+                <span class="username" id="top-username">用户</span>
+                <div class="avatar" id="top-avatar">U</div>
+            </div>
+        </header>
+<div class="messages-container" id="messages-container">
+            <div class="message system">
+                <div class="avatar"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+                <div class="bubble-container">
+                    <div class="bubble">
+                        你好！我是您的医疗助手。请告诉我您的症状，我会基于权威指南为您分析。<br>
+                        <span class="tip">隐私提示：对话内容仅供参考，不作为诊断依据。</span>
+                    </div>
+
+<div class="message-actions">
+    <button class="action-btn" onclick="ui.handleCopy(this)" title="复制">
+        <i class="fa-regular fa-copy"></i>
+    </button>
+    <button class="action-btn" onclick="ui.handleLike(this, 'like')" title="点赞">
+        <i class="fa-regular fa-thumbs-up"></i>
+    </button>
+    <button class="action-btn" onclick="ui.handleLike(this, 'dislike')" title="点踩">
+        <i class="fa-regular fa-thumbs-down"></i>
+    </button>
+    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="input-wrapper">
+            <div class="input-area">
+                <textarea id="user-input" rows="1" placeholder="输入您的问题... (Enter 发送)" style="overflow-y:hidden; resize:none;"></textarea>
+                <button id="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
+            <div class="footer-text">
+                RAG 医疗助手可能会犯错，请核查重要信息。
+            </div>
+        </div>
+    </main>
+</div>
+
+<div id="source-sidebar" class="source-sidebar">
+    <div class="sidebar-header">
+        <h3 class="sidebar-title" id="sidebar-title">参考资料</h3>
+        <button onclick="document.getElementById('source-sidebar').classList.remove('active')" style="background:none; border:none; color:#fff; font-size:24px; cursor:pointer;">×</button>
+    </div>
+    <div class="sidebar-body" id="sidebar-content">
+        </div>
+</div>
+
+<div id="delete-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <h3 class="modal-title">要删除对话吗？</h3>
+        <p class="modal-text">此操作将永久删除该条对话记录。</p>
+        <div class="modal-actions">
+            <button class="modal-btn cancel" onclick="closeDeleteModal()">取消</button>
+            <button class="modal-btn confirm" id="confirm-delete-btn">删除</button>
+        </div>
+    </div>
+</div>
+
+<div id="profile-modal" class="modal-overlay" style="display: none;">
+    <div class="profile-modal-content">
+        <button class="close-profile-btn" onclick="closeProfileModal()"><i class="fa-solid fa-xmark"></i></button>
+        <div class="profile-header">
+            <div class="profile-email" id="profile-email-display">user@example.com</div>
+            <div class="profile-avatar-large">
+                <span id="profile-avatar-text">U</span>
+                <div class="camera-badge" onclick="triggerAvatarUpload()"><i class="fa-solid fa-camera"></i></div>
+            </div>
+            <div class="profile-greeting"><span id="profile-username-display">User</span>，您好！</div>
+            <button class="manage-account-btn" onclick="openAccountModal()">管理您的账号</button>
+        </div>
+        <div class="profile-footer">
+            <button class="profile-action-item" onclick="addAccount()"><i class="fa-solid fa-user-plus"></i> 添加账号</button>
+            <button class="profile-action-item logout" onclick="handleLogout()"><i class="fa-solid fa-arrow-right-from-bracket"></i> 退出</button>
+        </div>
+    </div>
+</div>
+
+<div id="custom-alert-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="width: 320px; text-align: center;">
+        <div style="margin-bottom: 15px; font-size: 48px; color: #a8c7fa;"><i class="fa-solid fa-circle-check"></i></div>
+        <h3 class="modal-title" id="alert-title">操作成功</h3>
+        <p class="modal-text" id="alert-message">内容...</p>
+        <button class="modal-btn confirm" style="width: 100%;" onclick="document.getElementById('custom-alert-modal').style.display='none'">知道了</button>
+    </div>
+</div>
+
+<input type="file" id="avatar-input" accept="image/*" style="display: none;" onchange="handleAvatarSelected(this)">
+
+<script type="module" src="/static/js/main.js?v=2"></script>
+
+</body>
+</html>

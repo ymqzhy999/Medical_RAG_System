@@ -1,0 +1,33 @@
+version: '3.4'
+services:
+  weaviate:
+
+    image: semitechnologies/weaviate:1.19.0
+
+    command:
+    - --host
+    - 0.0.0.0
+    - --port
+    - '8080'
+    - --scheme
+    - http
+
+    ports:
+    - "8080:8080"  # HTTP API 端口
+    - "50051:50051" # gRPC 端口
+
+    volumes:
+    - ./weaviate_data:/var/lib/weaviate # 把数据存在当前目录，防止丢数据
+
+    environment:
+      # 开启匿名访问 (本地开发方便)
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      # 数据持久化路径
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      # 🔥 关键：设置为 'none'
+      # 因为我们会在 Python 代码里用 Ollama 算好向量传进去
+      # 不需要 Weaviate 自己去调 OpenAI 或 Transformers
+      DEFAULT_VECTORIZER_MODULE: 'none'
+      ENABLE_MODULES: ''
+      # 集群设置 (单机版默认即可)
+      CLUSTER_HOSTNAME: 'node1'
